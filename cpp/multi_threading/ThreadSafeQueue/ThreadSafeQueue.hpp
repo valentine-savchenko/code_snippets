@@ -5,6 +5,7 @@
 #include <memory>
 #include <initializer_list>
 #include <deque>
+#include <utility>
 
 template <typename T>
 class ThreadSafeQueue;
@@ -16,6 +17,7 @@ template <typename T>
 class ThreadSafeQueue
 {
 public:
+    using size_type = typename std::deque<T>::size_type;
 
     ThreadSafeQueue() = default;
     ThreadSafeQueue(std::initializer_list<T> items);
@@ -30,6 +32,9 @@ public:
 
     void push(T value);
 
+    template <typename... Args>
+    void emplace(Args&&... args);
+
     bool try_pop(T& value);
     std::shared_ptr<T> try_pop();
 
@@ -37,6 +42,9 @@ public:
     std::shared_ptr<T> wait_and_pop();
 
     bool empty() const;
+    size_type size() const;
+
+    void swap(ThreadSafeQueue<T>& other);
 
     friend bool operator==<T>(const ThreadSafeQueue<T>& left, const ThreadSafeQueue<T>& right);
 
@@ -119,6 +127,17 @@ void ThreadSafeQueue<T>::push(T value)
 }
 
 template <typename T>
+template <typename... Args>
+void ThreadSafeQueue<T>::emplace(Args&& ... args)
+{
+    {
+        std::lock_guard<std::mutex> lock{ mutex_ };
+        storage_.emplace_back(std::forward<Args>(args)...);
+    }
+    isPopulated_.notify_one();
+}
+
+template <typename T>
 bool ThreadSafeQueue<T>::try_pop(T& value)
 {
     std::lock_guard<std::mutex> lock{ mutex_ };
@@ -177,4 +196,24 @@ bool ThreadSafeQueue<T>::empty() const
 {
     std::lock_guard<std::mutex> lock{ mutex_ };
     return storage_.empty();
+}
+
+template <typename T>
+typename ThreadSafeQueue<T>::size_type ThreadSafeQueue<T>::size() const
+{
+    std::lock_guard<std::mutex> lock{ mutex_ };
+    return storage_.size();
+}
+
+template <typename T>
+void ThreadSafeQueue<T>::swap(ThreadSafeQueue& other)
+{
+    {
+        std::lock(mutex_, other.mutex_);
+        std::lock_guard<std::mutex> lock{ mutex_, std::adopt_lock };
+        std::lock_guard<std::mutex> otherLock{ other.mutex_, std::adopt_lock };
+        storage_.swap(other.storage_);
+    }
+    isPopulated_.notify_one();
+    other.isPopulated_.notify_one();
 }

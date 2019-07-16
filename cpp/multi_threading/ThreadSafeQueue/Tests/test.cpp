@@ -1,7 +1,8 @@
-#include "pch.h"
+#include "gtest/gtest.h"
 
 #include <thread>
 #include <chrono>
+#include <tuple>
 
 #include <ThreadSafeQueue.hpp>
 #include <ThreadStorage.h>
@@ -69,6 +70,19 @@ TEST(Tests, Push)
     ASSERT_EQ(expected, queue) << "Expecting all values pushed to the queue\n";
 }
 
+TEST(Tests, Emplace)
+{
+    using Tuple = std::tuple<char, int, double>;
+
+    ThreadSafeQueue<Tuple> queue{};
+
+    const Tuple v1{ 'a', 1, 1.1 };
+    queue.emplace(v1);
+
+    ThreadSafeQueue<Tuple> expected = { v1 };
+    ASSERT_EQ(expected, queue) << "Expecting all values pushed to the queue\n";
+}
+
 TEST(Tests, EmptyRefTryPop)
 {
     ThreadSafeQueue<int> queue{};
@@ -103,73 +117,108 @@ TEST(Tests, EmptyValueTryPop)
 TEST(Tests, WaitPushAndRefPop)
 {
     ThreadSafeQueue<int> queue{};
-
-    ThreadStorage threads{ 2u };
-    threads[0] = std::thread{ [&queue]()
     {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        queue.push(10);
-    } };
-    threads[1] = std::thread{ [&queue]()
-    {
-        int front{};
-        queue.wait_and_pop(front);
-    } };
+        ThreadStorage threads{ 2u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            queue.push(10);
+            queue.push(20);
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            int front{};
+            queue.wait_and_pop(front);
+        } };
+    }
 
-    ASSERT_TRUE(queue.empty()) << "Expecting a queue to be empty\n";
+    ASSERT_EQ(1, queue.size()) << "Expecting a queue to have one less value\n";
 }
 
 TEST(Tests, WaitPushAndValuePop)
 {
     ThreadSafeQueue<int> queue{};
-
-    ThreadStorage threads{ 2u };
-    threads[0] = std::thread{ [&queue]()
     {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        queue.push(10);
-    } };
-    threads[1] = std::thread{ [&queue]()
-    {
-        queue.wait_and_pop();
-    } };
+        ThreadStorage threads{ 2u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            queue.push(10);
+            queue.push(20);
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            queue.wait_and_pop();
+        } };
+    }
 
-    ASSERT_TRUE(queue.empty()) << "Expecting a queue to be empty\n";
+    ASSERT_EQ(1, queue.size()) << "Expecting a queue to have one less value\n";
 }
 
 TEST(Tests, WaitCopyAssignAndValuePop)
 {
     ThreadSafeQueue<int> queue{};
-
-    ThreadStorage threads{ 2u };
-    threads[0] = std::thread{ [&queue]()
     {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        ThreadSafeQueue<int> donor = { 13 };
-        queue = donor;
-    } };
-    threads[1] = std::thread{ [&queue]()
-    {
-        queue.wait_and_pop();
-    } };
+        ThreadStorage threads{ 2u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            ThreadSafeQueue<int> donor = { 13, 8 };
+            queue = donor;
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            queue.wait_and_pop();
+        } };
+    }
 
-    ASSERT_TRUE(queue.empty()) << "Expecting a queue to be empty\n";
+    ASSERT_EQ(1, queue.size()) << "Expecting a queue to have one less value\n";
 }
 
 TEST(Tests, WaitMoveAssignAndValuePop)
 {
     ThreadSafeQueue<int> queue{};
+    {
+        ThreadStorage threads{ 2u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            queue = std::move(ThreadSafeQueue<int>{ 7, 2 });
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            queue.wait_and_pop();
+        } };
+    }
 
-    ThreadStorage threads{ 2u };
-    threads[0] = std::thread{ [&queue]()
+    ASSERT_EQ(1, queue.size()) << "Expecting a queue to have one less value\n";
+}
+
+TEST(Tests, Size)
+{
+    const auto list = { 0, 9, 1, 8, 2, 7, 3, 6, 4, 5 };
+    ThreadSafeQueue<int> queue = list;
+
+    ASSERT_EQ(list.size(), queue.size()) << "Expecting a queue to take all values into account\n";
+}
+
+TEST(Tests, Swap)
+{
+    ThreadSafeQueue<int> queue{};
     {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        queue = std::move(ThreadSafeQueue<int>{ 7 });
-    } };
-    threads[1] = std::thread{ [&queue]()
-    {
+        ThreadStorage threads{ 2u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            ThreadSafeQueue<int> other = { 1, 2, 3 };
+            queue.swap(other);
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
         queue.wait_and_pop();
-    } };
+        } };
+    }
 
-    ASSERT_TRUE(queue.empty()) << "Expecting a queue to be empty\n";
+    ASSERT_EQ(2, queue.size())
+        << "Expecting the queue to have an element less after a swap and a pop";
 }
