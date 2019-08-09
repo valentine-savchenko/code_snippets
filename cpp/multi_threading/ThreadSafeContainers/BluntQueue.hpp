@@ -8,27 +8,27 @@
 #include <utility>
 
 template <typename T>
-class ThreadSafeQueue;
+class BluntQueue;
 
 template <typename T>
-bool operator==(const ThreadSafeQueue<T>& one, const ThreadSafeQueue<T>& other);
+bool operator==(const BluntQueue<T>& one, const BluntQueue<T>& other);
 
 template <typename T>
-class ThreadSafeQueue
+class BluntQueue
 {
 public:
     using size_type = typename std::deque<T>::size_type;
 
-    ThreadSafeQueue() = default;
-    ThreadSafeQueue(std::initializer_list<T> items);
+    BluntQueue() = default;
+    BluntQueue(std::initializer_list<T> items);
 
-    ThreadSafeQueue(const ThreadSafeQueue& other);
-    ThreadSafeQueue(ThreadSafeQueue&& other) noexcept;
+    BluntQueue(const BluntQueue& other);
+    BluntQueue(BluntQueue&& other) noexcept;
 
-    ThreadSafeQueue& operator=(const ThreadSafeQueue& other);
-    ThreadSafeQueue& operator=(ThreadSafeQueue&& other) noexcept;
+    BluntQueue& operator=(const BluntQueue& other);
+    BluntQueue& operator=(BluntQueue&& other) noexcept;
 
-    ~ThreadSafeQueue() noexcept = default;
+    ~BluntQueue() noexcept = default;
 
     void push(T value);
 
@@ -44,9 +44,9 @@ public:
     bool empty() const;
     size_type size() const;
 
-    void swap(ThreadSafeQueue<T>& other);
+    void swap(BluntQueue<T>& other);
 
-    friend bool operator==<T>(const ThreadSafeQueue<T>& left, const ThreadSafeQueue<T>& right);
+    friend bool operator==<T>(const BluntQueue<T>& one, const BluntQueue<T>& other);
 
 private:
 
@@ -57,7 +57,7 @@ private:
 };
 
 template <typename T>
-bool operator==(const ThreadSafeQueue<T>& one, const ThreadSafeQueue<T>& other)
+bool operator==(const BluntQueue<T>& one, const BluntQueue<T>& other)
 {
     std::lock(one.mutex_, other.mutex_);
     std::lock_guard<std::mutex> oneLock{ one.mutex_, std::adopt_lock };
@@ -66,7 +66,7 @@ bool operator==(const ThreadSafeQueue<T>& one, const ThreadSafeQueue<T>& other)
 }
 
 template <typename T>
-ThreadSafeQueue<T>::ThreadSafeQueue(std::initializer_list<T> items) :
+BluntQueue<T>::BluntQueue(std::initializer_list<T> items) :
     mutex_{},
     isPopulated_{},
     storage_{ items.begin(), items.end() }
@@ -75,7 +75,7 @@ ThreadSafeQueue<T>::ThreadSafeQueue(std::initializer_list<T> items) :
 }
 
 template <typename T>
-ThreadSafeQueue<T>::ThreadSafeQueue(const ThreadSafeQueue& other) :
+BluntQueue<T>::BluntQueue(const BluntQueue& other) :
     mutex_{},
     isPopulated_{}
 {
@@ -84,7 +84,7 @@ ThreadSafeQueue<T>::ThreadSafeQueue(const ThreadSafeQueue& other) :
 }
 
 template <typename T>
-ThreadSafeQueue<T>::ThreadSafeQueue(ThreadSafeQueue&& other) noexcept :
+BluntQueue<T>::BluntQueue(BluntQueue&& other) noexcept :
     mutex_{},
     isPopulated_{},
     storage_{ std::move(other.storage_) }
@@ -93,7 +93,7 @@ ThreadSafeQueue<T>::ThreadSafeQueue(ThreadSafeQueue&& other) noexcept :
 }
 
 template <typename T>
-ThreadSafeQueue<T>& ThreadSafeQueue<T>::operator=(const ThreadSafeQueue& other)
+BluntQueue<T>& BluntQueue<T>::operator=(const BluntQueue& other)
 {
     {
         std::lock(mutex_, other.mutex_);
@@ -106,7 +106,7 @@ ThreadSafeQueue<T>& ThreadSafeQueue<T>::operator=(const ThreadSafeQueue& other)
 }
 
 template <typename T>
-ThreadSafeQueue<T>& ThreadSafeQueue<T>::operator=(ThreadSafeQueue&& other) noexcept
+BluntQueue<T>& BluntQueue<T>::operator=(BluntQueue&& other) noexcept
 {
     {
         std::lock_guard<std::mutex> lock{ mutex_ };
@@ -117,7 +117,7 @@ ThreadSafeQueue<T>& ThreadSafeQueue<T>::operator=(ThreadSafeQueue&& other) noexc
 }
 
 template <typename T>
-void ThreadSafeQueue<T>::push(T value)
+void BluntQueue<T>::push(T value)
 {
     {
         std::lock_guard<std::mutex> lock{ mutex_ };
@@ -128,7 +128,7 @@ void ThreadSafeQueue<T>::push(T value)
 
 template <typename T>
 template <typename... Args>
-void ThreadSafeQueue<T>::emplace(Args&& ... args)
+void BluntQueue<T>::emplace(Args&& ... args)
 {
     {
         std::lock_guard<std::mutex> lock{ mutex_ };
@@ -138,7 +138,7 @@ void ThreadSafeQueue<T>::emplace(Args&& ... args)
 }
 
 template <typename T>
-bool ThreadSafeQueue<T>::try_pop(T& value)
+bool BluntQueue<T>::try_pop(T& value)
 {
     std::lock_guard<std::mutex> lock{ mutex_ };
     if (storage_.empty())
@@ -146,13 +146,13 @@ bool ThreadSafeQueue<T>::try_pop(T& value)
         return false;
     }
 
-    value = storage_.front();
+    value = std::move(storage_.front());
     storage_.pop_front();
     return true;
 }
 
 template <typename T>
-std::shared_ptr<T> ThreadSafeQueue<T>::try_pop()
+std::shared_ptr<T> BluntQueue<T>::try_pop()
 {
     std::shared_ptr<T> value{};
 
@@ -162,51 +162,51 @@ std::shared_ptr<T> ThreadSafeQueue<T>::try_pop()
         return value;
     }
 
-    value.reset(new T{ storage_.front() });
+    value.reset(new T{ std::move(storage_.front()) });
     storage_.pop_front();
     return value;
 }
 
 template <typename T>
-bool ThreadSafeQueue<T>::wait_and_pop(T& value)
+bool BluntQueue<T>::wait_and_pop(T& value)
 {
     std::unique_lock<std::mutex> lock{ mutex_ };
     isPopulated_.wait(lock, [this]() { return !storage_.empty(); });
 
-    value = storage_.front();
+    value = std::move(storage_.front());
     storage_.pop_front();
     return true;
 }
 
 template <typename T>
-std::shared_ptr<T> ThreadSafeQueue<T>::wait_and_pop()
+std::shared_ptr<T> BluntQueue<T>::wait_and_pop()
 {
     std::shared_ptr<T> value{};
 
     std::unique_lock<std::mutex> lock{ mutex_ };
     isPopulated_.wait(lock, [this]() { return !storage_.empty(); });
 
-    value.reset(new T{ storage_.front() });
+    value.reset(new T{ std::move(storage_.front()) });
     storage_.pop_front();
     return value;
 }
 
 template <typename T>
-bool ThreadSafeQueue<T>::empty() const
+bool BluntQueue<T>::empty() const
 {
     std::lock_guard<std::mutex> lock{ mutex_ };
     return storage_.empty();
 }
 
 template <typename T>
-typename ThreadSafeQueue<T>::size_type ThreadSafeQueue<T>::size() const
+typename BluntQueue<T>::size_type BluntQueue<T>::size() const
 {
     std::lock_guard<std::mutex> lock{ mutex_ };
     return storage_.size();
 }
 
 template <typename T>
-void ThreadSafeQueue<T>::swap(ThreadSafeQueue& other)
+void BluntQueue<T>::swap(BluntQueue& other)
 {
     {
         std::lock(mutex_, other.mutex_);

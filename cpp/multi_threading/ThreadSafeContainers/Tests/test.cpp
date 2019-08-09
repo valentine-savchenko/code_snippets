@@ -4,119 +4,119 @@
 #include <chrono>
 #include <tuple>
 
-#include <ThreadSafeQueue.hpp>
+#include <BluntQueue.hpp>
 #include <ThreadStorage.h>
 
-TEST(Tests, DefaultConstruction)
+TEST(BluntQueueTests, DefaultConstruction)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
 }
 
-TEST(Tests, InitializerListConstruction)
+TEST(BluntQueueTests, InitializerListConstruction)
 {
     auto list = { 8, 13, 62 };
-    ThreadSafeQueue<int> queue = list;
+    BluntQueue<int> queue = list;
 
-    ThreadSafeQueue<int> expected = list;
+    BluntQueue<int> expected = list;
     ASSERT_EQ(queue, expected) << "Expecting initializer list values properly transfered\n";
 }
 
-TEST(Tests, CopyConstruction)
+TEST(BluntQueueTests, CopyConstruction)
 {
-    ThreadSafeQueue<int> donor = { 7, 2, 9, 2 };
+    BluntQueue<int> donor = { 7, 2, 9, 2 };
 
-    ThreadSafeQueue<int> copy{ donor };
+    BluntQueue<int> copy{ donor };
 
     ASSERT_EQ(copy, donor) << "Expecting a copy to fully resemble the donor\n";
 } 
 
-TEST(Tests, MoveConstruction)
+TEST(BluntQueueTests, MoveConstruction)
 {
-     ThreadSafeQueue<int> moved{ std::move(ThreadSafeQueue<int>{ 1, 3 }) };
+     BluntQueue<int> moved{ std::move(BluntQueue<int>{ 1, 3 }) };
 
-     ThreadSafeQueue<int> expected = { 1, 3 };
+     BluntQueue<int> expected = { 1, 3 };
      ASSERT_EQ(moved, expected) << "Expecting a moved to contain original values\n";
 }
 
-TEST(Tests, CopyAssigned)
+TEST(BluntQueueTests, CopyAssigned)
 {
-    ThreadSafeQueue<int> source = { 5, 3, 4, 6 };
-    ThreadSafeQueue<int> target = { 1, 2, 3, 4, 5 };
+    BluntQueue<int> source = { 5, 3, 4, 6 };
+    BluntQueue<int> target = { 1, 2, 3, 4, 5 };
 
     target = source;
 
     ASSERT_EQ(target, source) << "Expecting an assigned to resemble the donor\n";
 }
 
-TEST(Tests, MoveAssigned)
+TEST(BluntQueueTests, MoveAssigned)
 {
-    ThreadSafeQueue<int> source = { 8, 5, 7, 1 };
-    ThreadSafeQueue<int> copy{ source };
-    ThreadSafeQueue<int> target = { 9, 8 };
+    BluntQueue<int> source = { 8, 5, 7, 1 };
+    BluntQueue<int> copy{ source };
+    BluntQueue<int> target = { 9, 8 };
 
     target = std::move(source);
 
     ASSERT_EQ(target, copy) << "Expecting a move assigned to contain original values\n";
 }
 
-TEST(Tests, Push)
+TEST(BluntQueueTests, Push)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
 
     const int v1{ 0 };
     queue.push(v1);
 
-    ThreadSafeQueue<int> expected = { v1 };
-    ASSERT_EQ(expected, queue) << "Expecting all values pushed to the queue\n";
+    BluntQueue<int> expected = { v1 };
+    ASSERT_EQ(expected, queue) << "Expecting all values pushed to the BluntQueue\n";
 }
 
-TEST(Tests, Emplace)
+TEST(BluntQueueTests, Emplace)
 {
     using Tuple = std::tuple<char, int, double>;
 
-    ThreadSafeQueue<Tuple> queue{};
+    BluntQueue<Tuple> queue{};
 
     const Tuple v1{ 'a', 1, 1.1 };
     queue.emplace(v1);
 
-    ThreadSafeQueue<Tuple> expected = { v1 };
-    ASSERT_EQ(expected, queue) << "Expecting all values pushed to the queue\n";
+    BluntQueue<Tuple> expected = { v1 };
+    ASSERT_EQ(expected, queue) << "Expecting all values pushed to the BluntQueue\n";
 }
 
-TEST(Tests, EmptyRefTryPop)
+TEST(BluntQueueTests, EmptyRefTryPop)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
 
     int front{};
     const bool responce = queue.try_pop(front);
 
-    ASSERT_EQ(false, responce) << "Expecting a failed attempt to pop from an empty queue\n";
+    ASSERT_EQ(false, responce) << "Expecting a failed attempt to pop from an empty BluntQueue\n";
 }
 
-TEST(Tests, FilledRefTryPop)
+TEST(BluntQueueTests, FilledRefTryPop)
 {
     const int v1{ 56 };
-    ThreadSafeQueue<int> queue = { v1, 12, 90 };
+    BluntQueue<int> queue = { v1, 12, 90 };
 
     int front{};
     const bool responce = queue.try_pop(front);
 
-    ASSERT_EQ(true, responce) << "Expecting a successful attempt to pop from a queue\n";
+    ASSERT_EQ(true, responce) << "Expecting a successful attempt to pop from a BluntQueue\n";
     ASSERT_EQ(v1, front) << "Expecting exact match with the front value\n";
 }
 
-TEST(Tests, EmptyValueTryPop)
+TEST(BluntQueueTests, EmptyValueTryPop)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
 
     const auto front = queue.try_pop();
 
-    ASSERT_FALSE(front) << "Expecting a failed attempt to pop from an empty queue\n";
+    ASSERT_FALSE(front) << "Expecting a failed attempt to pop from an empty BluntQueue\n";
 }
 
-TEST(Tests, WaitPushAndRefPop)
+TEST(BluntQueueTests, WaitPushAndRefPop)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
     {
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
@@ -132,12 +132,12 @@ TEST(Tests, WaitPushAndRefPop)
         } };
     }
 
-    ASSERT_EQ(1, queue.size()) << "Expecting a queue to have one less value\n";
+    ASSERT_EQ(1, queue.size()) << "Expecting a BluntQueue to have one less value\n";
 }
 
-TEST(Tests, WaitPushAndValuePop)
+TEST(BluntQueueTests, WaitPushAndValuePop)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
     {
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
@@ -152,18 +152,18 @@ TEST(Tests, WaitPushAndValuePop)
         } };
     }
 
-    ASSERT_EQ(1, queue.size()) << "Expecting a queue to have one less value\n";
+    ASSERT_EQ(1, queue.size()) << "Expecting a BluntQueue to have one less value\n";
 }
 
-TEST(Tests, WaitCopyAssignAndValuePop)
+TEST(BluntQueueTests, WaitCopyAssignAndValuePop)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
     {
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
         {
             std::this_thread::sleep_for(std::chrono::seconds(2));
-            ThreadSafeQueue<int> donor = { 13, 8 };
+            BluntQueue<int> donor = { 13, 8 };
             queue = donor;
         } };
         threads[1] = std::thread{ [&queue]()
@@ -172,18 +172,18 @@ TEST(Tests, WaitCopyAssignAndValuePop)
         } };
     }
 
-    ASSERT_EQ(1, queue.size()) << "Expecting a queue to have one less value\n";
+    ASSERT_EQ(1, queue.size()) << "Expecting a BluntQueue to have one less value\n";
 }
 
-TEST(Tests, WaitMoveAssignAndValuePop)
+TEST(BluntQueueTests, WaitMoveAssignAndValuePop)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
     {
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
         {
             std::this_thread::sleep_for(std::chrono::seconds(2));
-            queue = std::move(ThreadSafeQueue<int>{ 7, 2 });
+            queue = std::move(BluntQueue<int>{ 7, 2 });
         } };
         threads[1] = std::thread{ [&queue]()
         {
@@ -191,34 +191,34 @@ TEST(Tests, WaitMoveAssignAndValuePop)
         } };
     }
 
-    ASSERT_EQ(1, queue.size()) << "Expecting a queue to have one less value\n";
+    ASSERT_EQ(1, queue.size()) << "Expecting a BluntQueue to have one less value\n";
 }
 
-TEST(Tests, Size)
+TEST(BluntQueueTests, Size)
 {
     const auto list = { 0, 9, 1, 8, 2, 7, 3, 6, 4, 5 };
-    ThreadSafeQueue<int> queue = list;
+    BluntQueue<int> queue = list;
 
-    ASSERT_EQ(list.size(), queue.size()) << "Expecting a queue to take all values into account\n";
+    ASSERT_EQ(list.size(), queue.size()) << "Expecting a BluntQueue to take all values into account\n";
 }
 
-TEST(Tests, Swap)
+TEST(BluntQueueTests, Swap)
 {
-    ThreadSafeQueue<int> queue{};
+    BluntQueue<int> queue{};
     {
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
         {
             std::this_thread::sleep_for(std::chrono::seconds(2));
-            ThreadSafeQueue<int> other = { 1, 2, 3 };
+            BluntQueue<int> other = { 1, 2, 3 };
             queue.swap(other);
         } };
         threads[1] = std::thread{ [&queue]()
         {
-        queue.wait_and_pop();
+            queue.wait_and_pop();
         } };
     }
 
     ASSERT_EQ(2, queue.size())
-        << "Expecting the queue to have an element less after a swap and a pop";
+        << "Expecting the BluntQueue to have an element less after a swap and a pop";
 }

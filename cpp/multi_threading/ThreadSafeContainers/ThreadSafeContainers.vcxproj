@@ -156,7 +156,7 @@
     <ClCompile Include="ThreadStorage.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ThreadSafeQueue.hpp" />
+    <ClInclude Include="BluntQueue.hpp" />
     <ClInclude Include="ThreadStorage.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

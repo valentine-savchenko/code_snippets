@@ -23,10 +23,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ThreadSafeQueue.hpp">
+    <ClInclude Include="ThreadStorage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadStorage.h">
+    <ClInclude Include="BluntQueue.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
