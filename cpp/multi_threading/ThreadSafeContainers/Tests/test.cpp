@@ -5,6 +5,7 @@
 #include <tuple>
 
 #include <BluntQueue.hpp>
+#include <FineQueue.hpp>
 #include <ThreadStorage.h>
 
 TEST(BluntQueueTests, DefaultConstruction)
@@ -221,4 +222,97 @@ TEST(BluntQueueTests, Swap)
 
     ASSERT_EQ(2, queue.size())
         << "Expecting the BluntQueue to have an element less after a swap and a pop";
+}
+
+TEST(FineQueueTests, DefaultConstruction)
+{
+    FineQueue<int> queue{};
+}
+
+TEST(FineQueueTests, Push)
+{
+    FineQueue<int> queue{};
+
+    const int v1{ 8 }, v2{ 13 }, v3{ 62 };
+    queue.push(v1);
+    queue.push(v2);
+    queue.push(v3);
+
+    FineQueue<int> reference = { v1, v2, v3 };
+
+    ASSERT_EQ(queue, reference) << "Expecting a FineQueue to hold all pushed elements\n";
+}
+
+TEST(FineQueueTests, ParallelPush)
+{
+    constexpr int v1{ 8 }, v2{ 13 };
+    FineQueue<int> queue{};
+    {
+        ThreadStorage threads{ 2u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            queue.push(v1);
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            queue.push(v2);
+        } };
+    }
+
+    FineQueue<int> reference1 = { v1, v2 };
+    FineQueue<int> reference2 = { v2, v1 };
+    ASSERT_TRUE(queue == reference1 || queue == reference2)
+        << "Expecting a FineQueue to contain all pushed elements\n";
+}
+
+TEST(FineQueueTests, EmptyValueTryPop)
+{
+    FineQueue<int> queue{};
+
+    const auto front = queue.try_pop();
+
+    ASSERT_FALSE(front) << "Expecting a failed attempt to pop from an empty FineQueue\n";
+}
+
+TEST(FineQueueTests, FilledValueTryPop)
+{
+    constexpr int v1{ 8 }, v2{ 13 }, v3{ 62 };
+    FineQueue<int> queue = { v1, v2, v3 };
+
+    const auto p1 = queue.try_pop();
+    const auto p2 = queue.try_pop();
+    const auto p3 = queue.try_pop();
+    const auto p4 = queue.try_pop();
+
+    ASSERT_EQ(*p1, v1) << "Expecting the first element to show up first\n";
+    ASSERT_EQ(*p2, v2) << "Expecting the second element to show up second\n";
+    ASSERT_EQ(*p3, v3) << "Expecting the third element to show up third\n";
+    ASSERT_FALSE(p4) << "Expecting an empty queue afterwards\n";
+}
+
+TEST(FineQueueTests, ParallelValueTryPop)
+{
+    constexpr int v1{ 7 }, v2{ 8 }, v3{ 9 }, v4{ 10 };
+    FineQueue<int> queue = { 1, 2, 3, 4, 5, 6, v1, v2, v3, v4 };
+    {
+        ThreadStorage threads{ 3u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            queue.try_pop();
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            queue.try_pop();
+            queue.try_pop();
+            queue.try_pop();
+        } };
+        threads[2] = std::thread{ [&queue]()
+        {
+            queue.try_pop();
+            queue.try_pop();
+        } };
+    }
+
+    FineQueue<int> reference = { v1, v2, v3, v4 };
+    ASSERT_EQ(queue, reference) << "Expecting 4 elements to survive after parallel pops\n";
 }
