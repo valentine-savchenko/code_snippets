@@ -122,7 +122,7 @@ TEST(BluntQueueTests, WaitPushAndRefPop)
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
         {
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             queue.push(10);
             queue.push(20);
         } };
@@ -143,7 +143,7 @@ TEST(BluntQueueTests, WaitPushAndValuePop)
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
         {
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             queue.push(10);
             queue.push(20);
         } };
@@ -163,7 +163,7 @@ TEST(BluntQueueTests, WaitCopyAssignAndValuePop)
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
         {
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             BluntQueue<int> donor = { 13, 8 };
             queue = donor;
         } };
@@ -183,7 +183,7 @@ TEST(BluntQueueTests, WaitMoveAssignAndValuePop)
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
         {
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             queue = std::move(BluntQueue<int>{ 7, 2 });
         } };
         threads[1] = std::thread{ [&queue]()
@@ -210,7 +210,7 @@ TEST(BluntQueueTests, Swap)
         ThreadStorage threads{ 2u };
         threads[0] = std::thread{ [&queue]()
         {
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             BluntQueue<int> other = { 1, 2, 3 };
             queue.swap(other);
         } };
@@ -238,9 +238,8 @@ TEST(FineQueueTests, Push)
     queue.push(v2);
     queue.push(v3);
 
-    FineQueue<int> reference = { v1, v2, v3 };
-
-    ASSERT_EQ(queue, reference) << "Expecting a FineQueue to hold all pushed elements\n";
+    const FineQueue<int> reference = { v1, v2, v3 };
+    ASSERT_EQ(queue, reference) << "Expecting a queue to hold all pushed elements\n";
 }
 
 TEST(FineQueueTests, ParallelPush)
@@ -259,10 +258,51 @@ TEST(FineQueueTests, ParallelPush)
         } };
     }
 
-    FineQueue<int> reference1 = { v1, v2 };
-    FineQueue<int> reference2 = { v2, v1 };
+    const FineQueue<int> reference1 = { v1, v2 };
+    const FineQueue<int> reference2 = { v2, v1 };
     ASSERT_TRUE(queue == reference1 || queue == reference2)
-        << "Expecting a FineQueue to contain all pushed elements\n";
+        << "Expecting a queue to contain all pushed elements\n";
+}
+
+TEST(FineQueueTests, Emplace)
+{
+    using Tuple = std::tuple<char, int, double>;
+
+    FineQueue<Tuple> queue{};
+
+    const char v1{ 8 };
+    const int v2{ 13 };
+    const double v3{ 62 };
+    queue.emplace(v1, v2, v3);
+
+    const FineQueue<Tuple> reference = { std::make_tuple(v1, v2, v3) };
+    ASSERT_EQ(queue, reference) << "Expecting a queue to hold the emplace-ed element\n";
+}
+
+TEST(FineQueueTests, ParallelEmplace)
+{
+    using Tuple = std::tuple<char, int, double>;
+
+    constexpr char v1{ 8 };
+    constexpr int v2{ 13 };
+    constexpr double v3{ 62 };
+    FineQueue<Tuple> queue{};
+    {
+        ThreadStorage threads{ 2u };
+        threads[0] = std::thread{ [&]()
+        {
+            queue.emplace(v1, v2, v3);
+        } };
+        threads[1] = std::thread{ [&]()
+        {
+            queue.emplace(v1, v2, v3);
+        } };
+    }
+
+    const FineQueue<Tuple> reference = { std::make_tuple(v1, v2, v3),
+        std::make_tuple(v1, v2, v3) };
+    ASSERT_TRUE(queue == reference)
+        << "Expecting a queue to contain all pushed elements\n";
 }
 
 TEST(FineQueueTests, EmptyValueTryPop)
@@ -271,7 +311,7 @@ TEST(FineQueueTests, EmptyValueTryPop)
 
     const auto front = queue.try_pop();
 
-    ASSERT_FALSE(front) << "Expecting a failed attempt to pop from an empty FineQueue\n";
+    ASSERT_FALSE(front) << "Expecting a failed attempt to pop from an empty queue\n";
 }
 
 TEST(FineQueueTests, FilledValueTryPop)
@@ -313,6 +353,88 @@ TEST(FineQueueTests, ParallelValueTryPop)
         } };
     }
 
-    FineQueue<int> reference = { v1, v2, v3, v4 };
+    const FineQueue<int> reference = { v1, v2, v3, v4 };
     ASSERT_EQ(queue, reference) << "Expecting 4 elements to survive after parallel pops\n";
+}
+
+TEST(FineQueueTests, ParallelRefTryPop)
+{
+    constexpr int v1{ 7 }, v2{ 8 }, v3{ 9 }, v4{ 10 };
+    FineQueue<int> queue = { 1, 2, 3, 4, 5, 6, v1, v2, v3, v4 };
+    {
+        ThreadStorage threads{ 3u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            int dummy{};
+            queue.try_pop(dummy);
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            int dummy{};
+            queue.try_pop(dummy);
+            queue.try_pop(dummy);
+            queue.try_pop(dummy);
+        } };
+        threads[2] = std::thread{ [&queue]()
+        {
+            int dummy{};
+            queue.try_pop(dummy);
+            queue.try_pop(dummy);
+        } };
+    }
+
+    const FineQueue<int> reference = { v1, v2, v3, v4 };
+    ASSERT_EQ(queue, reference) << "Expecting 4 elements to survive after parallel pops\n";
+}
+
+TEST(FineQueueTests, PushAndWaitValuePop)
+{
+    FineQueue<int> queue{};
+    {
+        ThreadStorage threads{ 3u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            queue.push(8);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            queue.push(13);
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            queue.wait_and_pop();
+        } };
+        threads[2] = std::thread{ [&queue]()
+        {
+            queue.wait_and_pop();
+        } };
+    }
+
+    ASSERT_TRUE(queue.empty()) << "Expecting a queue to be totally empty\n";
+}
+
+TEST(FineQueueTests, PushAndWaitRefPop)
+{
+    FineQueue<int> queue{};
+    {
+        ThreadStorage threads{ 3u };
+        threads[0] = std::thread{ [&queue]()
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            queue.push(8);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            queue.push(13);
+        } };
+        threads[1] = std::thread{ [&queue]()
+        {
+            int dummy{};
+            queue.wait_and_pop(dummy);
+        } };
+        threads[2] = std::thread{ [&queue]()
+        {
+            int dummy{};
+            queue.wait_and_pop(dummy);
+        } };
+    }
+
+    ASSERT_TRUE(queue.empty()) << "Expecting a queue to be totally empty\n";
 }
