@@ -438,3 +438,91 @@ TEST(FineQueueTests, PushAndWaitRefPop)
 
     ASSERT_TRUE(queue.empty()) << "Expecting a queue to be totally empty\n";
 }
+
+TEST(FineQueueTests, ParallelCopyConstruction)
+{
+    std::initializer_list<int> values = { 8, 13, 62 };
+    FineQueue<int> donor = values;
+
+    std::thread pusher{ [&donor]()
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        donor.push(4);
+    } };
+    std::thread popper{ [&donor]()
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        donor.try_pop();
+    } };
+
+    FineQueue<int> copy{ donor };
+
+    popper.join();
+    pusher.join();
+
+    const FineQueue<int> reference = values;
+    ASSERT_EQ(reference, copy)
+        << "Expecting a copy to fully resemble initial state of the donor\n";
+}
+
+TEST(FineQueueTests, MoveConstruction)
+{
+    std::initializer_list<int> values = { 8, 13, 62 };
+
+    const FineQueue<int> queue{ std::move(FineQueue<int>(values)) };
+
+    const FineQueue<int> reference = values;
+    ASSERT_EQ(queue, reference) << "Expecting a copy to fully resemble the blueprint\n";
+}
+
+TEST(FineQueueTests, ParallelCopyAssigned)
+{
+    constexpr int v1{ 62 }, v2{ 13 }, v3{ 8 };
+    FineQueue<int> queue{ v3, v2, v1 };
+    FineQueue<int> donor{ v1, v2, v3 };
+
+    constexpr int p1{ 72 }, p2{ 92 };
+    std::thread pusher{ [&donor]()
+    {
+        donor.push(p1);
+        donor.push(p2);
+    } };
+ 
+    queue = donor;
+
+    pusher.join();
+
+    const FineQueue<int> reference{ v1, v2, v3 };
+    const FineQueue<int> reference1{ v1, v2, v3, p1 };
+    const FineQueue<int> reference2{ v1, v2, v3, p1, p2 };
+
+    ASSERT_TRUE(reference == queue || reference1 == queue || reference2 == queue)
+        << "Expecting a queue to receive all elements of the donor\n";
+}
+
+TEST(FineQueueTests, MoveAssigned)
+{
+    std::initializer_list<int> ref = { 8, 13, 62 };
+    FineQueue<int> queue{ 1, 2, 3 };
+
+    queue = std::move(FineQueue<int>{ ref });
+
+    const FineQueue<int> reference{ ref };
+    ASSERT_EQ(queue, reference)
+        << "Expecting a queue to absorb all elements of the donor\n";
+}
+
+TEST(FineQueueTests, Swap)
+{
+    std::initializer_list<int> init1{ 8, 13, 62 };
+    FineQueue<int> queue1{ init1 };
+    std::initializer_list<int> init2{ 62, 13, 8 };
+    FineQueue<int> queue2{ init2 };
+
+    queue1.swap(queue2);
+
+    const FineQueue<int> reference1{ init2 };
+    const FineQueue<int> reference2{ init1 };
+    ASSERT_EQ(queue1, reference1) << "Expecting a queue to grab partner's elements";
+    ASSERT_EQ(queue2, reference2) << "Expecting a queue to grab partner's elements";
+}
