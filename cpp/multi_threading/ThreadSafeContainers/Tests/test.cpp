@@ -248,11 +248,11 @@ TEST(FineQueueTests, ParallelPush)
     FineQueue<int> queue{};
     {
         ThreadStorage threads{ 2u };
-        threads[0] = std::thread{ [&queue]()
+        threads[0] = std::thread{ [v1, &queue]()
         {
             queue.push(v1);
         } };
-        threads[1] = std::thread{ [&queue]()
+        threads[1] = std::thread{ [v2, &queue]()
         {
             queue.push(v2);
         } };
@@ -482,7 +482,7 @@ TEST(FineQueueTests, ParallelCopyAssigned)
     FineQueue<int> donor{ v1, v2, v3 };
 
     constexpr int p1{ 72 }, p2{ 92 };
-    std::thread pusher{ [&donor]()
+    std::thread pusher{ [p1, p2, &donor]()
     {
         donor.push(p1);
         donor.push(p2);
