@@ -39,6 +39,23 @@ TEST(BluntQueueTests, MoveConstruction)
      ASSERT_EQ(moved, expected) << "Expecting a moved to contain original values\n";
 }
 
+TEST(BluntQueueTests, ParallelMoveConstruction)
+{
+    BluntQueue<int> donor = { 1, 2, 3, 4, 5 };
+
+    std::thread thread{ [](BluntQueue<int>&& donor)
+    {
+        BluntQueue<int> owner{ std::move(donor) };
+    }, std::move(donor) };
+
+    BluntQueue<int> competitor{ std::move(donor) };
+
+    thread.join();
+
+    ASSERT_TRUE(donor.empty()) << "Expecting a moved from queue to be empty";
+    ASSERT_TRUE(competitor.empty()) << "Expecting a competitor to be empty";
+}
+
 TEST(BluntQueueTests, CopyAssigned)
 {
     BluntQueue<int> source = { 5, 3, 4, 6 };
