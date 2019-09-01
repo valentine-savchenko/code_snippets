@@ -45,6 +45,7 @@ public:
 
 private:
 
+    // Maintain tenants at separate nodes to increase opportunity for concurrency
     struct Node
     {
         std::shared_ptr<T> data_;
@@ -113,13 +114,13 @@ template <typename T>
 FineQueue<T>::FineQueue(FineQueue&& other) noexcept :
     isPoppable_{},
     headMutex_{},
-    head_{ std::move(other.head_) },
+    head_{ nullptr },
     tailMutex_{},
-    tail_{ std::move(other.tail_) }
+    tail_{ nullptr }
 {
-    // It is caller's responsibility to ensure that the source queue
-    // is not being modified at any other thread
-    // (which is kind of extravagant to do in the first place)
+    std::scoped_lock<std::mutex, std::mutex> lock{ other.headMutex_, other.tailMutex_ };
+    head_ = std::move(other.head_);
+    tail_ = std::move(other.tail_);
 }
 
 template <typename T>
@@ -130,9 +131,7 @@ FineQueue<T>& FineQueue<T>::operator=(const FineQueue& other)
         return *this;
     }
 
-    // Clone elements of the source queue
-    // to provide the strong exception safety for the content
-    // Allow the queue to be extended (but not shrunk) while traversing it
+    // Clone elements of the source queue to provide the strong exception safety for the content
     std::unique_ptr<Node> head{ std::make_unique<Node>() };
     Node* tail{ head.get() };
     lock_traverse_push(other, tail);
@@ -151,13 +150,9 @@ FineQueue<T>& FineQueue<T>::operator=(const FineQueue& other)
 template <typename T>
 FineQueue<T>& FineQueue<T>::operator=(FineQueue&& other) noexcept
 {
-    // It is caller's responsibility to ensure that the source queue
-    // is not being modified at any other thread
-    // (which is kind of extravagant to do in the first place)
-
-    // Prevent any modifications to the content, before discarding it
     {
-        std::scoped_lock<std::mutex, std::mutex> lock{ headMutex_, tailMutex_ };
+        std::scoped_lock<std::mutex, std::mutex, std::mutex, std::mutex> lock{
+            headMutex_, tailMutex_, other.headMutex_, other.tailMutex_ };
         head_ = std::move(other.head_);
         tail_ = std::move(other.tail_);
     }
@@ -306,6 +301,7 @@ std::unique_lock<std::mutex> FineQueue<T>::wait_for_head()
 {
     std::unique_lock<std::mutex> lock{ headMutex_ };
     isPoppable_.wait(lock, [this]() { return head_.get() != get_tail(); });
+    // Transfer the lock to the caller to handle the rest of a critical section
     return lock;
 }
 
