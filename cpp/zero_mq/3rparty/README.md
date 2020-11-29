@@ -1,0 +1,1 @@
+powershell.exe -ExecutionPolicy Bypass -File .\deploy_cppzmq.ps1
