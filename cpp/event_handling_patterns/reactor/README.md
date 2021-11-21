@@ -1,0 +1,1 @@
+Based on theory explained at https://learning.oreilly.com/library/view/pattern-oriented-software-architecture/9781118725177/OEBPS/c03.htm#c03-s1
